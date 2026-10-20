@@ -1,0 +1,27 @@
+{
+  "mode": "standalone local model",
+  "checks": [
+    "WebGL canvas created",
+    "Clock and truck route positions advance",
+    "Normal operation has nonzero feed",
+    "Pause holds model time",
+    "UI scenario power-limit",
+    "UI scenario road-closure",
+    "UI scenario truck-breakdown",
+    "UI scenario low-grade",
+    "UI scenario hard-ore",
+    "UI scenario crusher-outage",
+    "Restore normal conditions",
+    "Settings apply to backend and reset shift",
+    "Fleet completes loading, haul, dump and return cycles",
+    "Paired forecast produces lower processed tonnes under power limit",
+    "3D asset inspector opens",
+    "Mobile layout has no horizontal overflow",
+    "No browser console or JavaScript errors"
+  ],
+  "errors": [],
+  "software_browser_fps": 18,
+  "full_docker_stack_verified": false,
+  "platform_readback_checked": false,
+  "measured_at": "2026-10-19T20:45:28.455Z"
+}

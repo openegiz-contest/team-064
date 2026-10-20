@@ -1,0 +1,26 @@
+test_controls_end_to_end (test_api.APITests.test_controls_end_to_end) ... ok
+test_health_and_source_are_honest (test_api.APITests.test_health_and_source_are_honest) ... ok
+test_invalid_controls_are_explicit (test_api.APITests.test_invalid_controls_are_explicit) ... ok
+test_paired_forecast_over_api (test_api.APITests.test_paired_forecast_over_api) ... ok
+test_static_bundle_is_served (test_api.APITests.test_static_bundle_is_served) ... ok
+test_breakdown_freezes_payload_and_position (test_model.ModelTests.test_breakdown_freezes_payload_and_position) ... ok
+test_counterfactual_is_reproducible_and_does_not_mutate (test_model.ModelTests.test_counterfactual_is_reproducible_and_does_not_mutate) ... ok
+test_eight_hour_baseline (test_model.ModelTests.test_eight_hour_baseline) ... ok
+test_extreme_parameters_remain_balanced (test_model.ModelTests.test_extreme_parameters_remain_balanced) ... ok
+test_grade_change_does_not_rewrite_loaded_ore (test_model.ModelTests.test_grade_change_does_not_rewrite_loaded_ore) ... ok
+test_invalid_settings (test_model.ModelTests.test_invalid_settings) ... ok
+test_power_cap_and_crusher_stop (test_model.ModelTests.test_power_cap_and_crusher_stop) ... ok
+test_reproducible_seed (test_model.ModelTests.test_reproducible_seed) ... ok
+test_route_closure_increases_next_trip_duration (test_model.ModelTests.test_route_closure_increases_next_trip_duration) ... ok
+test_scenarios_conserve_material (test_model.ModelTests.test_scenarios_conserve_material) ... ok
+test_atomic_snapshot_matches_numeric_twins (test_model.RuntimeTests.test_atomic_snapshot_matches_numeric_twins) ... ok
+test_control_settings_and_reset (test_model.RuntimeTests.test_control_settings_and_reset) ... ok
+test_ditto_topic_regression (test_model.RuntimeTests.test_ditto_topic_regression) ... ok
+test_integrated_has_no_silent_local_fallback (test_model.RuntimeTests.test_integrated_has_no_silent_local_fallback) ... ok
+test_pause_holds_time (test_model.RuntimeTests.test_pause_holds_time) ... ok
+test_stale_readback_is_not_live (test_model.RuntimeTests.test_stale_readback_is_not_live) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 1.416s
+
+OK

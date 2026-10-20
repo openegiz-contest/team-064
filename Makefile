@@ -8,8 +8,10 @@ COMPOSE_BASE := docker compose -f deploy/compose/docker-compose.yml
 # overlay, so `down` stops its simulator and `up` keeps its Grafana dashboard.
 # `make clean` forgets it.
 MINE_MARKER  := deploy/compose/.example-mine
+AKTOGAY_MARKER := deploy/compose/.aktogay-mine
 MINE_COMPOSE := examples/mine/compose.yml
-COMPOSE := $(COMPOSE_BASE)$(if $(wildcard $(MINE_MARKER)), -f $(MINE_COMPOSE))
+AKTOGAY_COMPOSE := team/aktogay/compose.yml
+COMPOSE := $(COMPOSE_BASE)$(if $(wildcard $(MINE_MARKER)), -f $(MINE_COMPOSE))$(if $(wildcard $(AKTOGAY_MARKER)), -f $(AKTOGAY_COMPOSE))
 
 ## Start the whole platform with Docker Compose (first run: generates credentials)
 up:
@@ -49,10 +51,17 @@ example-mine: up
 example-mine-stop:
 	$(COMPOSE_BASE) -f $(MINE_COMPOSE) stop mine-simulator
 
+## Start the Aktogay sulphide-line digital twin (platform + mine + spatial UI)
+.PHONY: aktogay
+aktogay: up
+	$(COMPOSE_BASE) -f $(AKTOGAY_COMPOSE) up -d --build --wait --wait-timeout 300
+	@touch $(AKTOGAY_MARKER)
+	@echo "Aktogay mine running: spatial view http://localhost:$${AKTOGAY_PORT:-8091}; Grafana http://localhost:$${GRAFANA_PORT:-3000}"
+
 ## Stop the platform and DELETE all its data and credentials
 clean:
 	$(COMPOSE) down -v --remove-orphans
-	rm -f deploy/compose/.env $(MINE_MARKER)
+	rm -f deploy/compose/.env $(MINE_MARKER) $(AKTOGAY_MARKER)
 
 # ---------------------------------------------------------------------------
 # Helm deployment (servers): the chart at the repository root
@@ -144,3 +153,11 @@ lint:
 	@bash scripts/compose-env.sh
 	docker compose -f deploy/compose/docker-compose.yml config -q
 	@echo "lint: ok"
+
+## Local model preview only (no Ditto/MQTT; explicitly labelled in the UI)
+.PHONY: aktogay-local test-aktogay
+aktogay-local:
+	AKTOGAY_MODE=standalone WEB_BIND=127.0.0.1 WEB_PORT=8091 python3 team/aktogay/app.py
+
+test-aktogay:
+	python3 -m unittest discover -s team/aktogay/tests -v
