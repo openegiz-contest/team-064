@@ -121,6 +121,16 @@ def twins():
         result[face]["attributes"]["loaded_by"] = f"{NS}:shovel-02" if face == "face-east" else f"{NS}:shovel-01"
     for road in ["road-main", "road-north"]:
         result[road]["attributes"]["connects"] = [f"{NS}:phase-sulphide-01", f"{NS}:rom-01"]
+    result['waste-dump-01']=thing('waste-dump-01','Waste destination','waste-dump','area-pit',
+        {'receives_from':f'{NS}:face-waste'},{'received':feature(0,'t')})
+    result['tailings-01']=thing('tailings-01','Processing tailings account','tailings-account','area-plant',
+        {'receives_from':f'{NS}:concentrator-01','scope':'mass and copper accounting only; no storage engineering'},
+        {'received':feature(0,'t'),'contained_copper':feature(0,'t Cu')})
+    result['concentrator-01']['attributes']['tailings_to']=f'{NS}:tailings-01'
+    for face in ('face-west','face-east','face-north'):
+        result[face]['attributes']['feeds']=f'{NS}:rom-01'
+    for i in range(1,9):
+        result[f'truck-{i:02}']['attributes']['delivers_to']=[f'{NS}:rom-01',f'{NS}:waste-dump-01']
     return {f"{NS}:{name}": body for name, body in result.items()}
 
 

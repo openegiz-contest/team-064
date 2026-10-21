@@ -23,7 +23,7 @@ const checks=[],errors=[];const check=(label,condition)=>{assert(condition,label
  await page.locator('#simulation').click();await wait(s=>s.status==='running');
  await page.locator('#speed').selectOption('180');await wait(s=>s.settings.speed===180);
  await page.locator('#whatifMode').click();
- const cases={'power-limit':s=>s.available_mw<=45&&s.feed_rate<=45000/21+.1,'road-closure':s=>s.road_main_closed,'truck-breakdown':s=>s.trucks.some(t=>t.state==='maintenance'),'low-grade':s=>s.face_props['face-east'].grade===.18,'hard-ore':s=>s.face_props['face-north'].hardness===20,'crusher-outage':s=>s.crusher_state==='fault'&&s.feed_rate===0};
+ const cases={'power-limit':s=>s.available_mw<=45&&s.feed_rate<=45000/21+.1,'road-closure':s=>s.road_main_closed,'truck-breakdown':s=>s.trucks.some(t=>t.state==='maintenance'),'low-grade':s=>s.face_props['face-east'].grade===.18,'hard-ore':s=>s.face_props['face-north'].hardness===20,'crusher-outage':s=>s.crusher_state==='fault'&&s.feed_rate===0,'shovel-outage':s=>s.shovels.some(x=>x.state==='fault'),'road-congestion':s=>s.roads['road-main'].capacity_vph_per_lane===12};
  for(const[id,predicate]of Object.entries(cases)){
   await page.locator(`[data-scenario="${id}"]`).click();await page.locator('#applyScenario').click();const s=await wait(s=>s.scenario===id&&predicate(s));check('UI scenario '+id,predicate(s));
   if(id==='power-limit')await page.screenshot({path:path.join(evidence,'power-limit.png')});
@@ -42,6 +42,11 @@ const checks=[],errors=[];const check=(label,condition)=>{assert(condition,label
  await page.locator('#simulation').click();await wait(s=>s.status==='running');
  const fps=await page.evaluate(()=>new Promise(resolve=>{let start=performance.now(),count=0;function tick(){count++;if(performance.now()-start>1500)resolve(Math.round(count*1000/(performance.now()-start)));else requestAnimationFrame(tick)}requestAnimationFrame(tick)}));
  console.log('MEASURED software-rendered browser fps',fps);await page.locator('#simulation').click();await wait(s=>s.status==='paused');
+ await page.locator('#overlay').click();check('Resource overlay toggles',await page.locator('#overlay').innerText()==='Overlay: resources');
+ await page.locator('#experimentScenario').selectOption('baseline');await page.locator('#experimentRun').click();
+ await wait(s=>s.experiment!==null);await page.locator('#experimentDialog').waitFor({state:'visible'});
+ check('Dispatch experiment result visible',await page.locator('#experimentDialog').innerText().then(t=>t.includes('Adaptive')));
+ await page.screenshot({path:path.join(evidence,'dispatch-experiment.png')});await page.locator('#experimentClose').click();
  await page.locator('#settingsOpen').click();await page.screenshot({path:path.join(evidence,'settings.png')});await page.locator('#settingsClose').click();
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);check('Mobile layout has no horizontal overflow',await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(evidence,'mobile.png'),fullPage:true});
  check('No browser console or JavaScript errors',errors.length===0);

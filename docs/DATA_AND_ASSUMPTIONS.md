@@ -40,9 +40,9 @@ throughput or availability.
 |---|---:|---|
 | Active 220 t trucks | 8 | 2–8; remaining twins are parked |
 | Shovel loading | 6.5 min | 3–12 min, seeded ±8% variability; two shared resources |
-| Main loaded haul | 9 min | 5–20 min; north leg duration ×1.45 |
+| Main loaded haul | 9 min | 5–20 min; reference speed at 6% main-road grade |
 | Empty return | 0.85 × loaded-leg duration | Longer alternative route remains effective |
-| Main/north road distance | 3.8 / 5.2 km | Used only for average speed calculation; scene units are schematic |
+| Main/north road distance | 3.8 / 5.2 km | Used in travel time; scene units are schematic |
 | Ore-face grades F1/F2/F3 | 0.31 / 0.39 / 0.27 % Cu | Each 0.10–1.00 % Cu |
 | Grade target | 0.34 % Cu | 0.15–0.80 % Cu; target may be infeasible for selected face grades |
 | Base hardness | 12.4 kWh/t | 8–24; face offsets +0.6 / −0.9 / +2.6 |
@@ -95,11 +95,45 @@ remove material already mined under that condition.
 
 3D coordinates are scene units, not surveyed metres. Truck and shovel size is
 exaggerated for legibility. The renderer interpolates only between received
-states; the backend controls all simulated progress. Road traffic spacing,
-collisions, road gradients and shovel relocation are not modeled.
+states; the backend controls all simulated progress. Road admission uses per-direction headway. Collisions, overtaking, road curvature and shovel relocation are not modeled.
 
 ## Data rights
 
 No mine datasets are redistributed. Public sources above are retained by link.
 All operating inputs are original synthetic examples. Third-party graphics and
 software are attributed in `ASSET_CREDITS.md`, under their original licenses.
+
+## Version 3 constraints and assumptions
+
+All new parameters below are synthetic, not Aktogay measurements.
+
+- Ore reserves: 85,000 t per face, adjustable 220–150,000 t. Waste cut: 120,000 t.
+  Loading deducts reserves continuously; final loads may be partial. Restore
+  normal conditions does not replenish a depleted face. Reset starts a new shift.
+- Road admission: 36 vehicles/h per direction by default, adjustable 6–60.
+  Minimum headway = 3,600 / capacity seconds. Congestion caps main-road capacity
+  at 12. Trucks initially on roads are a seeded initial condition.
+- Main/north grade: 6% / 8%, adjustable 0–12%. Reference flat speed =
+  (3.8 km / reference haul hours) × 1.30. Loaded speed divides this by
+  (1 + 0.05 × grade); empty speed additionally divides by 0.85. Speeds cap
+  at 45 km/h loaded and 50 km/h empty. Travel time = distance / speed.
+  These coefficients approximate the direction of response, not vehicle physics.
+- Bucket: 45 t nominal, adjustable 25–65, fill factor 0.90.
+  Passes = ceil(target payload / (bucket × 0.90)). Service time = passes ×
+  reference loading minutes / 6 × seeded variation (0.92–1.08).
+- Tailings mass = processed ore − concentrate. Tailings contained copper =
+  processed contained copper − recovered copper. No water/geotechnical model.
+- Dispatch grade error is mass-weighted absolute deviation from target in
+  percentage points. Fleet waiting minutes sum waits across all trucks.
+- Resource and processing residuals supplement the ore/waste/copper balances.
+
+Mechanism reference: Caterpillar, “Ensure Your Haul Roads Are an Asset”
+https://www.cat.com/en_US/blog/mining/articles/ensure-haul-roads-are-an-asset.html
+explains why grade and road condition matter. It does not supply our coefficients.
+
+A policy experiment deep-copies the same current state into both alternatives,
+changes only dispatch policy, and applies the same scenario and horizon.
+Per-truck loading variation uses seed, truck ID and load count. Already committed
+loads retain assignments. Results are conditional simulation evidence. In low-grade
+conditions, higher production can come with worse grade error. Final ROM is shown
+because higher throughput may consume an existing buffer rather than improve supply.

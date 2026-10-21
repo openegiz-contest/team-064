@@ -1,10 +1,21 @@
-# Aktogay · Shift Operations 2.0
+# Aktogay · Shift Operations 3.0
 
 An interactive 3D digital twin of one representative Aktogay sulphide line:
 pit faces → haulage → ROM → primary crusher → concentrator feed.
 Operating inputs and terrain are synthetic. Site identity and the approximately
 25 Mt/year line basis are grounded in the sources in
 [Data and Assumptions](docs/DATA_AND_ASSUMPTIONS.md).
+
+## Version 3
+
+Finite reserves, road admission queues, gradient-dependent travel, bucket-based
+loading, two additional scenarios, resource overlays and matched dispatch
+experiments strengthen the original model. Read [the upgrade guide](docs/V3_UPGRADE.md)
+for the exact changes and a judge demonstration sequence.
+
+**Validation status:** 31 model/API tests pass. V3 browser rendering and full
+Docker integration still require the checks below on your machine. Historical
+screenshots show the preceding version, not an independently verified v3 run.
 
 ## Start the OpenEgiz submission
 
@@ -135,7 +146,7 @@ deletes platform volumes and credentials and is not needed for this update.
 |---|---|
 | Start disabled / WAITING FOR DITTO | Inspect `make logs S=aktogay-mine` and `make logs S=ditto-connectivity`; the overlay requires a confirmed `operator_state` feature, not just an MQTT connection. |
 | Old 2D interface | Rebuild with `make aktogay`, then hard-refresh the browser. |
-| SIM clock/events/KPIs disagree | Version 2 uses one atomic platform snapshot. Verify the image was rebuilt and that the new API returns `snapshot` and `transport`. |
+| SIM clock/events/KPIs disagree | The model uses one atomic platform snapshot. Verify the image was rebuilt and that the new API returns `snapshot` and `transport`. |
 | Slow graphics | Use the efficient/default quality and a smaller window. Software renderers are detected automatically. High quality increases pixel density and requires more rendering capacity. |
 | 3D unavailable | Enable browser hardware acceleration/WebGL. A graphics error is reported; no static image is passed off as 3D. |
 | Docker unavailable in Ubuntu | Enable Ubuntu WSL integration and check that `docker version` lists both Client and Server. |
@@ -146,7 +157,7 @@ deletes platform volumes and credentials and is not needed for this update.
 - `team/aktogay/app.py`: controls, MQTT protocol, atomic Ditto readback and HTTP/static server.
 - `team/aktogay/static/scene.js`: original procedural 3D scene and state-driven equipment.
 - `team/aktogay/static/ui.js`, `style.css`: controls, charts, settings and inspection.
-- `team/aktogay/setup_twins.py`: 27 twins, containment and process relations.
+- `team/aktogay/setup_twins.py`: 29 twins, containment and process relations.
 - `docs/EVIDENCE_MAP.md`: official criterion-to-implementation mapping.
 - `ASSET_CREDITS.md`: bundled graphics sources, licenses and checksums.
 - `presentation.pdf`: current project presentation and verification boundary.

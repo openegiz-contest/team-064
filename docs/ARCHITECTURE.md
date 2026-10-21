@@ -2,7 +2,7 @@
 
 ## Integrated execution
 
-`make aktogay` runs the OpenEgiz Compose stack, initialises 27 Ditto twins, then
+`make aktogay` runs the OpenEgiz Compose stack, initialises 29 Ditto twins, then
 starts the Python model/API/static service. The simulation starts READY.
 
 Control button → local HTTP command → validated model transition → MQTT
@@ -22,7 +22,7 @@ The HTTP state endpoint returns only the confirmed snapshot plus separately labe
 transport diagnostics. The aggregate snapshot is published after the asset features.
 
 A single publishing lock preserves command/heartbeat order. A readback worker checks
-Ditto every ~0.7 seconds without blocking UI requests on 27 serial REST calls. Snapshot
+Ditto every ~0.7 seconds without blocking UI requests on 29 serial REST calls. Snapshot
 age, not successful MQTT enqueueing, determines freshness (under 6 seconds). A stale
 snapshot holds the scene; an absent snapshot shows a waiting panel instead of zeros.
 The same snapshot is republished while paused so a paused model can remain connected.
@@ -71,3 +71,7 @@ unknown controls and invalid operation states return an explicit HTTP 400.
 The banner explicitly says LOCAL MODEL / PLATFORM OFF. This developer-only route
 supports tests when Docker is unavailable; it is not the contest deployment and
 is never used automatically as a fallback in integrated mode.
+
+V3 adds POST `/api/experiment` with scenario `id` and integer `minutes` (30–480).
+Pause first. The service compares rotation/adaptive clones and returns the result
+through the same confirmed snapshot. Reset clears previous results.

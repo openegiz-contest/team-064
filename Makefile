@@ -161,3 +161,7 @@ aktogay-local:
 
 test-aktogay:
 	python3 -m unittest discover -s team/aktogay/tests -v
+
+.PHONY: benchmark-aktogay
+benchmark-aktogay:
+	python3 scripts/benchmark_dispatch.py

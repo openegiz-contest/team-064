@@ -33,7 +33,7 @@ class ModelTests(unittest.TestCase):
   for _ in range(600):
    m.step(5)
    t=next((t for t in m.trucks if t['state']=='loaded_haul' and t['material']=='ore'),None)
-   if t:self.assertEqual(t['route'],'road-north');self.assertAlmostEqual(t['duration'],9*60*1.45);found=True;break
+   if t:self.assertEqual(t['route'],'road-north');self.assertAlmostEqual(t['duration'],m.travel_seconds('road-north',True));self.assertGreater(t['duration'],m.travel_seconds('road-main',True));found=True;break
   self.assertTrue(found)
  def test_grade_change_does_not_rewrite_loaded_ore(self):
   m=Mine();m.step(1200);before=copy.deepcopy(m.trucks);m.apply_scenario('low-grade')

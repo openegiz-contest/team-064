@@ -35,18 +35,19 @@ Aktogay operating record. Public sources are listed in
 `docs/DATA_AND_ASSUMPTIONS.md`.
 
 ## Team
-|Tau-Ken Labs (Team-064); Majhabul Hoque Tahsim — sole member and developer|
+
+**Tau-Ken Labs (Team-064)**. Sole member and developer: **Majhabul Hoque Tahsim**.
+
 | GitHub |
 |---|
-| @Catacombs666 |
-
+| **@Catacombs666** |
 
 ## Mine
 
-Version 2.0 represents 27 Eclipse Ditto things in namespace `org.aktogay`: the
+Version 3.0 represents 29 Eclipse Ditto things in namespace `org.aktogay`: the
 mine, three areas, one pit phase, three ore faces, one waste cut, two haul roads,
 two shared shovels, eight truck twins (2–8 active), a crusher, ROM stockpile,
-concentrator, substation, maintenance crew and dispatch service. `_parents`
+concentrator, substation, maintenance crew, dispatch service, waste dump and tailings accounting twin. `_parents`
 represents containment; `feeds`, `supplies`, `connects` and `loaded_by` record
 process relationships. Three-dimensional scene positions are illustrative.
 
@@ -73,10 +74,26 @@ operating state. All scenarios can be undone using **Restore normal conditions**
 |---|---|---|
 | Crusher outage | Crusher throughput stops; arrivals fill ROM until trucks queue. ROM cannot feed past the stopped crusher. | Fault indication, zero feed, changing inventory, queue and event |
 | Truck breakdown | HT-03 (or the first active truck in a two-truck fleet) stops in place; its payload remains accounted for. | Stationary failed asset, reduced active fleet, retained payload |
-| Main road closure | Committed trucks clear the route; subsequent trips use the 45% longer-duration north route. | Closure barrier, changed truck routes, longer cycles |
+| Main road closure | Committed trucks clear the route; subsequent trips use the longer north route with distance and gradient dependent travel. | Closure barrier, changed truck routes, longer cycles |
 | Power curtailment | Supply is capped at 45 MW or the configured lower supply. | Substation state; feed ≤ 45,000/21 = 2,143 t/h |
 | Low-grade F2 | New loads sample 0.18% Cu. Existing loads retain their quality. | Face condition, dispatch choices and delayed mixed feed change |
+| Shovel outage | SH-02 stops. Partial payload is held. Future assignments use available shovels. | Fault state, queues, new assignments and delayed feed effects |
+| Road congestion | Main road admission falls to 12 vehicles/hour/direction. | Entry queues, road overlay and wait counters |
 | Hard F3 | New F3 loads sample 20 kWh/t. Adaptive dispatch can avoid F3. | Face condition, changed assignments; delayed or small plant response |
+
+## Version 3 engineering additions
+
+Finite ore reserves decrease during loading and depleted faces stop supplying
+material. Roads admit trucks at a bounded headway per direction. Distance,
+gradient and loaded/empty state determine travel time. Bucket size determines
+loading passes. Waste and processing tailings have explicit accounting twins.
+The resource overlay shows reserves, queues and faults. Scenario propagation
+panels distinguish observed changes from matched forecasts.
+
+The dispatch comparison runs fixed rotation and adaptive dispatch from the same
+paused state and matched per-truck loading variation. It reports production,
+grade error, waiting, energy and final ROM. The live shift remains unchanged.
+An infeasible blend target generates a warning. See `docs/V3_UPGRADE.md`.
 
 ## Mine visualization
 
@@ -102,10 +119,11 @@ material during normal operation. The model is not calibrated to operator record
 
 ## What works and what does not
 
-Implemented and exercised locally: model/API tests, full baseline haul cycles,
-all six scenario controls, pause/resume/reset, validated settings, 3D WebGL,
-asset inspection, paired forecast, responsive interface and report export.
-Browser evidence in `docs/evidence/` is explicitly local-mode evidence.
+Version 3 model/API validation passes 31 tests. A five-seed, five-condition
+benchmark records all 25 matched policy comparisons, including adverse tradeoffs.
+The v3 browser interface is implemented but has not been visually verified here.
+User-supplied screenshots in the presentation show the preceding working version.
+They are labelled accordingly and do not prove v3 integration.
 
 **Not yet verified:** Docker/Stand startup, real broker delivery and Ditto
 acceptance, Telegraf/InfluxDB ingestion and Grafana display. Docker is absent in
@@ -116,9 +134,8 @@ publish alone is never treated as confirmation of a twin update.
 ## Limitations
 
 The model has shared shovel resources, but no shovel relocation time, detailed
-truck collision/overtaking dynamics, surveyed terrain, road gradient model,
-calibrated comminution circuit, fuel consumption, automatic repair duration,
-tailings management or operational safety logic. Road lengths and 3D scene units
+truck collision/overtaking dynamics, surveyed terrain, calibrated comminution circuit, fuel consumption, automatic repair duration,
+tailings storage engineering or operational safety logic. Road lengths and 3D scene units
 are different scales; equipment is enlarged for readability. Graphics quality
 is selectable and software rendering has a reduced-resolution profile. All
 state is in memory and a service restart begins a new shift; reports can be exported.

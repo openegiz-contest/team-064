@@ -34,6 +34,25 @@ class APITests(unittest.TestCase):
   self.assertEqual(self.request('/static/%2e%2e/model.py')[0],403)
  def test_health_and_source_are_honest(self):
   _,d=self.request('/healthz');self.assertEqual(d['mode'],'standalone');self.assertFalse(d['mqtt']);self.assertTrue(d['ok'])
+ def test_dispatch_experiment_over_api(self):
+  self.request('/api/reset',{})
+  code,_=self.request('/api/experiment',{'id':'low-grade','minutes':60});self.assertEqual(code,200)
+  _,d=self.request('/api/state');e=d['snapshot']['experiment']
+  self.assertEqual(set(e['results']),{'rotation','adaptive'})
+  self.assertEqual(d['snapshot']['minute'],0)
+  self.request('/api/control',{'action':'start'})
+  self.assertEqual(self.request('/api/experiment',{'minutes':60})[0],400)
+  self.request('/api/reset',{})
+  self.assertIsNone(self.request('/api/state')[1]['snapshot']['experiment'])
+ def test_eight_scenarios_expose_resource_effects(self):
+  _,catalog=self.request('/api/scenarios');self.assertEqual(len(catalog['scenarios']),8)
+  self.request('/api/reset',{});self.request('/api/control',{'action':'start'})
+  for scenario in ('shovel-outage','road-congestion'):
+   self.assertEqual(self.request('/api/scenario',{'id':scenario})[0],200)
+   s=self.request('/api/state')[1]['snapshot']
+   if scenario=='shovel-outage':self.assertEqual(s['shovels'][1]['state'],'fault')
+   else:self.assertEqual(s['roads']['road-main']['capacity_vph_per_lane'],12)
+  self.request('/api/reset',{})
  def test_paired_forecast_over_api(self):
   code,_=self.request('/api/compare',{'id':'power-limit'});self.assertEqual(code,200)
   _,d=self.request('/api/state');self.assertEqual(d['snapshot']['comparison']['scenario'],'power-limit')

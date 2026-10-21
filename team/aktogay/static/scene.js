@@ -21,8 +21,8 @@ export class MineScene {
   for(let i=0;i<8;i++){const truck=this.makeTruck(i);this.trucks.push(truck);this.scene.add(truck.group);}
   this.addExcavator([-52,-22,1],0);this.addExcavator([-26,-22,-12],1);
   this.addLabel('PIT PHASE 01',[-45,-3,-42],'pit');this.addLabel('ROM BUFFER',[40,11,27],'rom-01');this.addLabel('PRIMARY CRUSHER',[59,17,4],'crusher-01');this.addLabel('CONCENTRATOR',[73,20,-29],'concentrator-01');this.addLabel('SUBSTATION',[38,8,-42],'substation-01');
-  for(const o of [...this.trucks.map(t=>t.group),...this.excavators.map(e=>e.g),this.pile,...this.beltPieces.map(p=>p.mesh)])o.traverse(m=>{if(m.isMesh)m.castShadow=false;});
-  this.mergeStatic();
+  for(const o of [...this.trucks.map(t=>t.group),...this.excavators.map(e=>e.g),this.pile,this.wastePile,...this.beltPieces.map(p=>p.mesh)])o.traverse(m=>{if(m.isMesh)m.castShadow=false;});
+  this.mergeStatic();this.buildOverlay();
   this.selectionRing=new THREE.Mesh(new THREE.TorusGeometry(3.7,.12,8,60),new THREE.MeshBasicMaterial({color:0x78efd3,transparent:true,opacity:.85,depthTest:false}));this.selectionRing.rotation.x=-Math.PI/2;this.selectionRing.visible=false;this.scene.add(this.selectionRing);
   this.ray=new THREE.Raycaster();this.pointer=new THREE.Vector2();let down;
   host.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY]});host.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>5)return;const r=host.getBoundingClientRect();this.pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);this.ray.setFromCamera(this.pointer,this.camera);let hit=this.ray.intersectObjects(this.pickables,true)[0];if(hit){let o=hit.object;while(o&&!o.userData.asset)o=o.parent;if(o)this.onSelect(o.userData.asset);}});
@@ -36,7 +36,7 @@ export class MineScene {
  mergeStatic(){
   // Reduce draw calls for the CPU-rendered judge browser; movable/selected assets stay separate.
   this.scene.updateMatrixWorld(true);
-  const dynamic=new Set([...this.trucks.map(t=>t.group),...this.excavators.map(e=>e.g),this.pile,this.crusherLamp,this.subLamp,...this.beltPieces.map(p=>p.mesh)]);
+  const dynamic=new Set([...this.trucks.map(t=>t.group),...this.excavators.map(e=>e.g),this.pile,this.wastePile,this.closure,this.crusherLamp,this.subLamp,...this.beltPieces.map(p=>p.mesh)]);
   const batches=new Map(),remove=[];
   this.scene.traverse(o=>{if(!o.isMesh||Array.isArray(o.material))return;let p=o,asset='';while(p){if(dynamic.has(p))return;if(p.userData.asset)asset=p.userData.asset;p=p.parent;}
    const key=o.material.uuid+'|'+asset+'|'+Object.keys(o.geometry.attributes).sort().join(',');
@@ -44,7 +44,7 @@ export class MineScene {
    let g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrixWorld);batches.get(key).geometries.push(g);remove.push(o);
   });
   for(const o of remove)o.removeFromParent();
-  this.pickables=[...this.trucks.map(t=>t.group),...this.excavators.map(e=>e.g),this.pile];
+  this.pickables=[...this.trucks.map(t=>t.group),...this.excavators.map(e=>e.g),this.pile,this.wastePile];
   for(const batch of batches.values()){const geo=mergeGeometries(batch.geometries,false);if(!geo)throw Error('Static geometry merge failed');const mesh=this.mesh(geo,batch.material);if(batch.asset){mesh.userData.asset=batch.asset;this.pickables.push(mesh);}for(const g of batch.geometries)g.dispose();}
  }
  material(color,metalness=0,roughness=.92){return this.software?new THREE.MeshLambertMaterial({color}):new THREE.MeshStandardMaterial({color,metalness,roughness});}
@@ -161,7 +161,7 @@ export class MineScene {
   // ROM stockpile, scaled from the simulation inventory.
   const pile=this.mesh(new THREE.ConeGeometry(9,8,48),this.material('#a8956e'));pile.position.set(40,4.6,29);this.pile=pile;pile.userData.asset='rom-01';this.pickables.push(pile);
   this.box(24,.7,24,40,.35,29,this.mat.rock);this.box(.5,3,22,28,1.5,29,this.mat.light);this.box(24,3,.5,40,1.5,41,this.mat.light);
-  const waste=this.mesh(new THREE.ConeGeometry(9,5,12),this.mat.rock);waste.position.set(22,2.8,51);
+  const waste=this.mesh(new THREE.ConeGeometry(9,5,12),this.mat.rock);waste.position.set(22,2.8,51);this.wastePile=waste;waste.userData.asset="waste-dump-01";this.pickables.push(waste);
   // Primary crusher with hopper, frame, platform and service stairs.
   const crusher=new THREE.Group();crusher.userData.asset='crusher-01';this.pickables.push(crusher);this.scene.add(crusher);crusher.position.set(59,0,5);
   for(const x of [-4,4])for(const z of [-3,3])this.box(.6,10,.6,x,5,z,this.mat.steel,crusher);
@@ -182,7 +182,7 @@ export class MineScene {
   for(const x of [-6,3]){this.cyl(1.5,1.5,3,x,14,0,this.mat.steel,plant);this.cyl(1.8,1.8,.2,x,15.5,0,this.mat.dark,plant);}
   for(const x of [52,61]){this.cyl(3,3,6,x,3,-26,this.mat.steel);this.cyl(3.15,3.15,.3,x,6.2,-26,this.mat.light);}
   // Thickener and processing tanks connected by visible pipework.
-  this.cyl(8.5,8.5,2.5,77,1.6,-52,this.mat.light,undefined,40);this.cyl(8,8,.1,77,2.9,-52,this.material('#385b61',.35,.3),undefined,40);this.beam([68,3.4,-52],[86,3.4,-52],.35,this.mat.steel);
+  const tailings=this.cyl(8.5,8.5,2.5,77,1.6,-52,this.mat.light,undefined,40);tailings.userData.asset='tailings-01';this.pickables.push(tailings);this.cyl(8,8,.1,77,2.9,-52,this.material('#385b61',.35,.3),undefined,40);this.beam([68,3.4,-52],[86,3.4,-52],.35,this.mat.steel);
   this.beam([61,4,-26],[65,4,-26],.7,this.mat.steel);this.beam([77,3,-43],[77,3,-48],.6,this.mat.steel);
   // Electrical switchyard: transformer banks, insulators and gantry.
   const sub=new THREE.Group();sub.position.set(35,.3,-39);sub.userData.asset='substation-01';this.scene.add(sub);this.pickables.push(sub);
@@ -207,30 +207,65 @@ export class MineScene {
   for(let z=-56;z<=45;z+=5){this.box(.12,2,.12,99,1,z,this.mat.steel);if(z<45)this.beam([99,1.8,z],[99,1.8,z+5],.05,this.mat.steel);}
   this.box(12,4,7,79,2,35,this.mat.light);this.box(13,.4,8,79,4.2,35,this.mat.dark);for(let x=74;x<=84;x+=3)this.box(1.8,1.3,.1,x,2.5,38.55,this.mat.glass);
  }
+ buildOverlay(){
+  this.overlay=false;this.faceMarkers={};this.roadHighlights={};
+  for(const[id,pos]of Object.entries(this.faces)){
+   const marker=this.mesh(new THREE.ConeGeometry(3.2,2.5,10),this.material('#c4aa73'));
+   marker.position.set(pos[0],pos[1]+1.2,pos[2]);marker.userData.asset=id;marker.castShadow=false;this.faceMarkers[id]=marker;this.pickables.push(marker);
+   this.addLabel(id.replace('face-','').toUpperCase(),[pos[0],pos[1]+9,pos[2]],id);this.labels.at(-1).resource=true;
+  }
+  for(const[id,points]of Object.entries({'road-main':this.mainEnd,'road-north':this.northEnd})){
+   const g=new THREE.BufferGeometry().setFromPoints(points.map(p=>new THREE.Vector3(p[0],p[1]+.5,p[2])));
+   const line=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x6dd4bd,depthTest:false}));line.visible=false;this.scene.add(line);this.roadHighlights[id]=line;
+   const pos=points[Math.floor(points.length/2)];this.addLabel(id==='road-main'?'MAIN ROAD':'NORTH ROAD',[pos[0],pos[1]+6,pos[2]],id);this.labels.at(-1).resource=true;
+  }
+  for(const t of this.trucks){
+   const ring=new THREE.Mesh(new THREE.TorusGeometry(2.4,.10,5,24),new THREE.MeshBasicMaterial({color:0x6dd4bd,depthTest:false}));
+   ring.rotation.x=-Math.PI/2;ring.position.y=.25;t.group.add(ring);t.stateRing=ring;
+  }
+ }
+ toggleOverlay(){this.overlay=!this.overlay;return this.overlay;}
  addLabel(text,position,asset){const el=document.createElement('button');el.className='world-label';el.textContent=text;el.setAttribute('aria-label','Inspect '+text);el.onclick=()=>this.onSelect(asset);this.labelHost.appendChild(el);this.labels.push({el,position:new THREE.Vector3(...position),asset});}
  select(id){this.selected=id;}
  update(s,fresh){if(!s)return;if(this.state?.sequence===s.sequence){this.fresh=fresh;return;}this.previous=this.state;this.state=s;this.received=performance.now();this.fresh=fresh;}
- point(t){const key=t.face+t.route+t.material;const curve=this.paths[key]||this.paths['face-westroad-mainore'];let p=curve.getPointAt(Math.max(0,Math.min(1,t.position)));let dir=curve.getTangentAt(Math.max(0,Math.min(1,t.position)));const n=new THREE.Vector3(-dir.z,0,dir.x).normalize();p.addScaledVector(n,t.state==='empty_return'?-1.25:1.25);
-  if(['queue_at_shovel','loading'].includes(t.state)){p.set(...this.faces[t.face]);p.z+=(Number(t.id.slice(-2))%3)*2.2;p.x-=t.state==='queue_at_shovel'?3:0;dir.set(1,0,0);}
-  if(t.state==='parked'){p.set(82,1,20+Number(t.id.slice(-2))*2.5);dir.set(1,0,0);}
+ point(t){
+  const state=t.state==='maintenance'?(t.saved_state||t.state):t.state;
+  const key=t.face+t.route+t.material,curve=this.paths[key]||this.paths['face-westroad-mainore'];
+  const progress=Math.max(0,Math.min(1,t.position));let p=curve.getPointAt(progress),dir=curve.getTangentAt(progress);
+  const n=new THREE.Vector3(-dir.z,0,dir.x).normalize();p.addScaledVector(n,state==='empty_return'?-1.25:1.25);
+  const queueRank=filter=>(this.state?.trucks||[]).filter(filter).sort((a,b)=>a.wait_since-b.wait_since||a.id.localeCompare(b.id)).findIndex(x=>x.id===t.id);
+  if(['queue_at_shovel','loading','waiting_for_resource'].includes(state)){
+   p.set(...this.faces[t.face]);const rank=Math.max(0,queueRank(x=>x.face===t.face&&x.state===t.state));
+   if(state!=='loading'){p.x-=5+rank*5.8;p.z+=4;}dir.set(1,0,0);
+  }
+  if(state==='queue_at_crusher'){const rank=Math.max(0,queueRank(x=>x.state==='queue_at_crusher'));p.set(49-rank*6,1,16);dir.set(1,0,0);}
+  if(state==='queue_road_loaded'){const rank=Math.max(0,queueRank(x=>x.state===t.state));p.set(-30-rank*5.8,-23,9);dir.set(1,0,0);}
+  if(state==='queue_road_empty'){const rank=Math.max(0,queueRank(x=>x.state===t.state));p.set(51+rank*5.8,1,21);dir.set(-1,0,0);}
+  if(state==='parked'){p.set(82,1,20+Number(t.id.slice(-2))*3);dir.set(1,0,0);}
   return {p,dir};
  }
  animate(){requestAnimationFrame(()=>this.animate());this.controls.update();const s=this.state,now=performance.now();
   if(s){let blend=Math.min(1,(now-this.received)/800);const moving=s.status==='running'&&this.fresh;const renderMinute=moving&&this.previous&&this.previous.minute<=s.minute?THREE.MathUtils.lerp(this.previous.minute,s.minute,blend):s.minute;
    for(let i=0;i<this.trucks.length;i++){const t=s.trucks[i],obj=this.trucks[i];if(!t)continue;let point=this.point(t);let old=this.previous?.trucks[i];if(old&&old.face===t.face&&old.route===t.route&&old.state===t.state&&moving){let prior=this.point(old);point.p.lerpVectors(prior.p,point.p,blend);}
-    obj.group.position.copy(point.p);obj.group.rotation.y=-Math.atan2(point.dir.z,point.dir.x)+(t.state==='empty_return'?Math.PI:0);
+    obj.group.position.copy(point.p);obj.group.rotation.y=-Math.atan2(point.dir.z,point.dir.x)+((t.state==='empty_return'||t.state==='maintenance'&&t.saved_state==='empty_return')?Math.PI:0);
+    obj.stateRing.visible=this.overlay||t.state==='maintenance';
+    obj.stateRing.material.color.set(t.state==='maintenance'?'#ed7050':t.state.startsWith('queue')||t.state==='waiting_for_resource'?'#edbc6c':'#6dd4bd');
     obj.ore.visible=t.payload>.01;obj.ore.scale.y=.08+.40*t.payload/220;
     const dumping=['dumping','dumping_waste'].includes(t.state);obj.bed.rotation.z=dumping?Math.sin((old&&old.state===t.state&&moving?THREE.MathUtils.lerp(old.stage_progress,t.stage_progress,blend):t.stage_progress)*Math.PI)*.72:0;
     obj.dust.visible=moving&&['loaded_haul','empty_return'].includes(t.state);obj.beacon.material.color.set(t.state==='maintenance'?'#eb6347':'#e9aa43');
     for(const w of obj.wheels)w.rotation.y=moving&&t.speed?(-s.minute*15):0;
    }
-   this.pile.scale.y=Math.max(.08,s.rom_t/8000);this.pile.position.y=.6+4*this.pile.scale.y;
+   const pileScale=Math.cbrt(Math.max(.001,s.rom_t/8000));this.pile.scale.setScalar(pileScale);this.pile.position.y=.6+4*pileScale;
+   const wasteScale=Math.cbrt(Math.max(.001,s.waste_dumped/2500));this.wastePile.scale.setScalar(Math.min(1.8,wasteScale));this.wastePile.position.y=.3+2.5*this.wastePile.scale.y;
+   for(const[id,marker]of Object.entries(this.faceMarkers)){const r=s.resources?.[id];if(r){const scale=Math.cbrt(Math.max(.001,r.remaining_t/r.initial_t));marker.scale.setScalar(scale);marker.position.y=this.faces[id][1]+1.2*scale;marker.material.color.set(r.state==='depleted'?'#e86f50':'#c4aa73');}}
+   for(const[id,line]of Object.entries(this.roadHighlights)){const r=s.roads?.[id];line.visible=this.overlay;line.material.color.set(r?.closed?'#ed7050':r?.queue?'#edbc6c':'#6dd4bd');}
+   for(const l of this.labels){if(l.resource){const r=s.resources?.[l.asset],road=s.roads?.[l.asset];l.el.textContent=r?l.asset.replace('face-','').toUpperCase()+' · '+Math.round(r.remaining_t).toLocaleString()+' t':(l.asset==='road-main'?'MAIN':'NORTH')+' · '+(road?.closed?'CLOSED':(road?.queue||0)+' waiting');l.el.classList.toggle('fault',r?.state==='depleted'||road?.closed);}}
    this.closure.visible=s.road_main_closed;this.crusherLamp.material.color.set(s.crusher_state==='fault'?'#e76043':'#66cfb2');this.subLamp.material.color.set(s.scenario==='power-limit'?'#ea9e43':'#66cfb2');
-   for(const ex of this.excavators){const loading=s.trucks.some(t=>t.state==='loading'&&(t.face==='face-east'?1:0)===ex.index);ex.turret.rotation.y=loading?Math.sin(renderMinute*2)*.38:0;ex.arm.rotation.z=loading?Math.sin(renderMinute*3)*.12:0;}
+   for(const ex of this.excavators){const loading=s.shovels?.[ex.index]?.state==='loading';ex.turret.rotation.y=loading?Math.sin(renderMinute*2)*.38:0;ex.arm.rotation.z=loading?Math.sin(renderMinute*3)*.12:0;}
    for(const part of this.beltPieces){part.mesh.visible=s.feed_rate>0;let phase=(part.offset+renderMinute*.18)%1;part.mesh.position.lerpVectors(part.a,part.b,phase);part.mesh.position.y+=.9;}
   }
-  if(this.selectionRing&&s){let t=s.trucks.find(t=>t.id===this.selected);let pos=t?this.point(t).p:null;const staticPos={'pit':[-37,-23.4,0],'rom-01':[40,1,29],'crusher-01':[59,.5,5],'concentrator-01':[74,.5,-30],'substation-01':[35,.5,-39],'shovel-01':[-52,-22,1],'shovel-02':[-26,-22,-12]};if(!pos&&staticPos[this.selected])pos=new THREE.Vector3(...staticPos[this.selected]);this.selectionRing.visible=!!pos;if(pos){this.selectionRing.position.copy(pos);this.selectionRing.position.y+=.25;this.selectionRing.scale.setScalar(t?1:1.7);}}
-  const occupied=[];for(const l of this.labels){let v=l.position.clone().project(this.camera);let x=(v.x*.5+.5)*this.host.clientWidth,y=(-v.y*.5+.5)*this.host.clientHeight;const collide=occupied.some(p=>Math.abs(p[0]-x)<125&&Math.abs(p[1]-y)<28);const visible=v.z<1&&x>60&&x<this.host.clientWidth-50&&y>150&&y<this.host.clientHeight-35&&!collide;l.el.style.display=visible?'block':'none';if(visible){l.el.style.left=x+'px';l.el.style.top=y+'px';occupied.push([x,y]);}}
+  if(this.selectionRing&&s){let t=s.trucks.find(t=>t.id===this.selected);let pos=t?this.point(t).p:null;const staticPos={'pit':[-37,-23.4,0],'rom-01':[40,1,29],'crusher-01':[59,.5,5],'concentrator-01':[74,.5,-30],'substation-01':[35,.5,-39],'shovel-01':[-52,-22,1],'shovel-02':[-26,-22,-12],'road-main':[42,1,16],'road-north':[40,1,-16],'waste-dump-01':[22,1,51],'tailings-01':[77,1,-52],...this.faces};if(!pos&&staticPos[this.selected])pos=new THREE.Vector3(...staticPos[this.selected]);this.selectionRing.visible=!!pos;if(pos){this.selectionRing.position.copy(pos);this.selectionRing.position.y+=.25;this.selectionRing.scale.setScalar(t?1:1.7);}}
+  const occupied=[];for(const l of this.labels){let v=l.position.clone().project(this.camera);let x=(v.x*.5+.5)*this.host.clientWidth,y=(-v.y*.5+.5)*this.host.clientHeight;const collide=occupied.some(p=>Math.abs(p[0]-x)<125&&Math.abs(p[1]-y)<28);const visible=(!l.resource||this.overlay)&&v.z<1&&x>60&&x<this.host.clientWidth-50&&y>150&&y<this.host.clientHeight-35&&!collide;l.el.style.display=visible?'block':'none';if(visible){l.el.style.left=x+'px';l.el.style.top=y+'px';occupied.push([x,y]);}}
   this.renderer.render(this.scene,this.camera);
  }
 }

@@ -38,12 +38,22 @@ def main():
  post('/api/control',{'action':'start'})
  tests={'crusher-outage':lambda s:s['crusher_state']=='fault' and s['feed_rate']==0,'truck-breakdown':lambda s:any(t['state']=='maintenance' for t in s['trucks']),
         'road-closure':lambda s:s['road_main_closed'],'power-limit':lambda s:s['available_mw']<=45 and s['feed_rate']<=45000/21+.01,
-        'low-grade':lambda s:s['face_props']['face-east']['grade']==.18,'hard-ore':lambda s:s['face_props']['face-north']['hardness']==20}
+        'low-grade':lambda s:s['face_props']['face-east']['grade']==.18,'hard-ore':lambda s:s['face_props']['face-north']['hardness']==20,
+        'shovel-outage':lambda s:any(x['id']=='shovel-02' and x['state']=='fault' for x in s['shovels']),
+        'road-congestion':lambda s:s['roads']['road-main']['capacity_vph_per_lane']==12}
  for key,predicate in tests.items():
   post('/api/scenario',{'id':key});s=wait(lambda s:s['scenario']==key and predicate(s));check('Scenario '+key,True)
-  check(key+' material balances',max(abs(s[k]) for k in ['ore_balance_error','waste_balance_error','copper_balance_error'])<.01)
+  check(key+' material balances',max(abs(s[k]) for k in ['ore_balance_error','waste_balance_error','copper_balance_error','reserve_balance_error','processing_balance_error'])<.01)
  post('/api/scenario',{'id':'baseline'});wait(lambda s:s['scenario']=='baseline')
  post('/api/compare',{'id':'power-limit'});wait(lambda s:s['comparison'] is not None);check('Paired forecast returns through Ditto',True)
+ post('/api/control',{'action':'pause'});paused=wait(lambda s:s['status']=='paused')
+ post('/api/experiment',{'id':'baseline','minutes':60});e=wait(lambda s:s.get('experiment') is not None)
+ check('Matched dispatch experiment confirmed through Ditto',set(e['experiment']['results'])=={'rotation','adaptive'})
+ check('Experiment preserves live clock',e['minute']==paused['minute'])
+ for asset in ('waste-dump-01','tailings-01'):
+  obj=req(ditto+'/api/2/things/org.aktogay:'+asset,headers=auth('ditto',env['DITTO_PASSWORD']))
+  check('Accounting twin '+asset,obj.get('thingId')=='org.aktogay:'+asset and bool(obj.get('features')))
+ post('/api/control',{'action':'start'})
  # Ensure the time-series pipeline receives current points, not an older run.
  start=time.time();influx='http://127.0.0.1:'+env.get('INFLUXDB_PORT','8086');found=False
  for _ in range(25):

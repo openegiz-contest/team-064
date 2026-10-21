@@ -1,8 +1,18 @@
 test_controls_end_to_end (test_api.APITests.test_controls_end_to_end) ... ok
+test_dispatch_experiment_over_api (test_api.APITests.test_dispatch_experiment_over_api) ... ok
+test_eight_scenarios_expose_resource_effects (test_api.APITests.test_eight_scenarios_expose_resource_effects) ... ok
 test_health_and_source_are_honest (test_api.APITests.test_health_and_source_are_honest) ... ok
 test_invalid_controls_are_explicit (test_api.APITests.test_invalid_controls_are_explicit) ... ok
 test_paired_forecast_over_api (test_api.APITests.test_paired_forecast_over_api) ... ok
 test_static_bundle_is_served (test_api.APITests.test_static_bundle_is_served) ... ok
+test_experiment_requires_pause_and_reset_clears_result (test_constraints.ConstraintsTests.test_experiment_requires_pause_and_reset_clears_result) ... ok
+test_experiment_validation (test_constraints.ConstraintsTests.test_experiment_validation) ... ok
+test_finite_faces_deplete_and_idle_without_creating_material (test_constraints.ConstraintsTests.test_finite_faces_deplete_and_idle_without_creating_material) ... ok
+test_gradient_and_bucket_change_service (test_constraints.ConstraintsTests.test_gradient_and_bucket_change_service) ... ok
+test_matched_experiment_nonmutating_and_reproducible (test_constraints.ConstraintsTests.test_matched_experiment_nonmutating_and_reproducible) ... ok
+test_road_admission_enforces_headway_per_direction (test_constraints.ConstraintsTests.test_road_admission_enforces_headway_per_direction) ... ok
+test_shovel_fault_holds_partial_load_then_recovers (test_constraints.ConstraintsTests.test_shovel_fault_holds_partial_load_then_recovers) ... ok
+test_twins_and_resource_telemetry_agree (test_constraints.ConstraintsTests.test_twins_and_resource_telemetry_agree) ... ok
 test_breakdown_freezes_payload_and_position (test_model.ModelTests.test_breakdown_freezes_payload_and_position) ... ok
 test_counterfactual_is_reproducible_and_does_not_mutate (test_model.ModelTests.test_counterfactual_is_reproducible_and_does_not_mutate) ... ok
 test_eight_hour_baseline (test_model.ModelTests.test_eight_hour_baseline) ... ok
@@ -21,6 +31,6 @@ test_pause_holds_time (test_model.RuntimeTests.test_pause_holds_time) ... ok
 test_stale_readback_is_not_live (test_model.RuntimeTests.test_stale_readback_is_not_live) ... ok
 
 ----------------------------------------------------------------------
-Ran 21 tests in 1.416s
+Ran 31 tests in 1.863s
 
 OK

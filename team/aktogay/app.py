@@ -16,7 +16,7 @@ import urllib.request
 import uuid
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
-from model import Mine,DEFAULTS,SCENARIOS,validate,compare
+from model import Mine,DEFAULTS,SCENARIOS,validate,compare,dispatch_experiment
 
 log=logging.getLogger('aktogay');NS='org.aktogay'
 ROOT=Path(__file__).resolve().parent
@@ -35,20 +35,30 @@ def telemetry(snapshot):
     # One atomic snapshot prevents mixed revisions/times across UI widgets.
     result['mine-01'].update(scenario=v(s['scenario']),operator_state=v(json.dumps(s,separators=(',',':'))),
                             sequence=v(s['sequence']),run_id=v(s['run_id']),simulation_status=v(s['status']))
-    for name,p in s['face_props'].items():result[name]={'grade':v(p['grade'],'% Cu'),'hardness':v(p['hardness'],'kWh/t'),'material':v('ore')}
-    result['face-waste']={'grade':v(0,'% Cu'),'material':v('waste')}
+    for name,p in s['face_props'].items():
+        resource=s['resources'][name]
+        result[name]={'grade':v(p['grade'],'% Cu'),'hardness':v(p['hardness'],'kWh/t'),'material':v('ore'),
+            'available_tonnes':v(resource['remaining_t'],'t'),'state':v(resource['state'])}
+    result['face-waste']={'grade':v(0,'% Cu'),'material':v('waste'),'available_tonnes':v(s['resources']['face-waste']['remaining_t'],'t')}
     for route in ['road-main','road-north']:
         closed=route=='road-main' and s['road_main_closed']
         result[route]={'state':v('closed; committed trips clearing' if closed else 'open'),'closed':v(closed),
-                       'occupancy':v(sum(t['route']==route and t['state'] in ('loaded_haul','empty_return') for t in s['trucks']),'trucks')}
+                       'occupancy':v(s['roads'][route]['occupancy'],'trucks'),
+                       'waiting':v(s['roads'][route]['queue'],'trucks'),
+                       'capacity_per_lane':v(s['roads'][route]['capacity_vph_per_lane'],'vehicles/h'),
+                       'gradient':v(s['roads'][route]['gradient_pct'],'%'),
+                       'admitted_loaded':v(s['roads'][route]['entries']['loaded'],'vehicles')}
     for t in s['trucks']:
         result[t['id']]={'state':v(t['state']),'payload':v(t['payload'],'t'),'material':v(t['material']),
            'assigned_face':v(t['face']),'destination':v('waste dump' if t['material']=='waste' else 'ROM stockpile'),
            'speed':v(t['speed'],'km/h'),'route_position':v(t['position'],'ratio'),'route':v(t['route']),
-           'trips_total':v(t['trips'],'trips'),'dispatch_reason':v(t['reason'])}
-    for i in range(2):
-        loading=any(t['state']=='loading' and (1 if t['face']=='face-east' else 0)==i for t in s['trucks'])
-        result[f'shovel-{i+1:02}']={'state':v('loading' if loading else 'available'),'payload_rate':v(220*60/s['settings']['load_minutes'] if loading else 0,'t/h')}
+           'trips_total':v(t['trips'],'trips'),'dispatch_reason':v(t['reason']),'waiting_time':v(t['wait_seconds']/60,'min')}
+    for shovel in s['shovels']:
+        result[shovel['id']]={'state':v(shovel['state']),'payload_rate':v(shovel['payload_rate'],'t/h'),
+            'assigned_face':v(shovel['face'] or 'none'),'truck':v(shovel['truck'] or 'none'),
+            'utilization':v(shovel['utilization_pct'],'%'),'bucket_capacity':v(shovel['bucket_t'],'t')}
+    result['waste-dump-01']={'received':v(s['waste_dumped'],'t')}
+    result['tailings-01']={'received':v(s['metrics']['tailings_t'],'t'),'contained_copper':v(s['processed_cu']-s['metrics']['recovered_cu_t'],'t Cu')}
     result['rom-01']={'level':v(s['rom_t'],'t'),'fill_pct':v(s['rom_pct'],'%'),'grade':v(s['grade'],'% Cu'),'hardness':v(s['hardness'],'kWh/t')}
     result['crusher-01']={'state':v(s['crusher_state']),'throughput':v(s['feed_rate'],'t/h'),'feed_grade':v(s['grade'],'% Cu'),
                          'feed_hardness':v(s['hardness'],'kWh/t'),'tonnes_total':v(s['processed'],'t'),'power_draw':v(s['power_draw']*8/21,'MW')}
@@ -76,7 +86,7 @@ class Runtime:
         settings=dict(DEFAULTS,speed=float(os.getenv('SIM_SPEEDUP','60')),seed=int(os.getenv('SIM_SEED','64')))
         self.mine=Mine(settings);self.publish_lock=threading.Lock();self.lock=threading.RLock();self.stop=threading.Event();self.connected=False
         self.status='ready';self.sequence=0;self.run_id=uuid.uuid4().hex[:12]
-        self.history=[];self.comparison=None;self.verified=None;self.verified_at=0.0
+        self.history=[];self.comparison=None;self.experiment=None;self.experiment_lock=threading.Lock();self.verified=None;self.verified_at=0.0
         self.last_publish=0.0;self.last_error='Waiting for platform telemetry' if self.mode=='integrated' else None
         self.mqtt=None;self.last_snapshot=None
         self.ditto_url=os.getenv('DITTO_URL','http://localhost:8080').rstrip('/')
@@ -87,7 +97,7 @@ class Runtime:
         with self.lock:
             self.sequence+=1;s=self.mine.snapshot()
             s.update(sequence=self.sequence,run_id=self.run_id,status=self.status,published_at=time.time(),
-                     history=copy.deepcopy(self.history),comparison=copy.deepcopy(self.comparison))
+                     history=copy.deepcopy(self.history),comparison=copy.deepcopy(self.comparison),experiment=copy.deepcopy(self.experiment))
             self.last_snapshot=s
             return s
 
@@ -161,21 +171,34 @@ class Runtime:
     def command(self,action,data):
         if not isinstance(data,dict):raise ValueError('JSON body must be an object')
         if action=='compare':
-            with self.lock:m=copy.deepcopy(self.mine)
+            with self.lock:source_mine=self.mine;m=copy.deepcopy(self.mine)
             scenario=data.get('id','power-limit')
             result=compare(m,scenario)
-            with self.lock:self.comparison=result;self.mine.event(f"60-minute paired forecast completed: {scenario}.")
+            with self.lock:
+                if self.mine is not source_mine:raise ValueError('Shift changed during forecast; run it again')
+                self.comparison=result;self.mine.event(f"60-minute paired forecast completed: {scenario}.")
+        elif action=='experiment':
+            if not self.experiment_lock.acquire(blocking=False):raise ValueError('An experiment is already running')
+            try:
+                with self.lock:
+                    if self.status=='running':raise ValueError('Pause the shift before comparing dispatch policies')
+                    source_mine=self.mine;m=copy.deepcopy(self.mine)
+                result=dispatch_experiment(m,data.get('id','baseline'),data.get('minutes',240))
+                with self.lock:
+                    if self.mine is not source_mine:raise ValueError('Shift changed during experiment; run it again')
+                    self.experiment=result;self.mine.event('Matched dispatch comparison completed; inspect trade-offs.')
+            finally:self.experiment_lock.release()
         else:
             with self.lock:
                 if action in ('start','resume'):
                     self.status='running';self.mine.event('Simulation running.')
                 elif action=='pause':self.status='paused';self.mine.event('Simulation paused. All material and equipment states held.')
                 elif action=='reset':
-                    self.mine=Mine(self.mine.settings);self.status='ready';self.history=[];self.comparison=None
+                    self.mine=Mine(self.mine.settings);self.status='ready';self.history=[];self.comparison=None;self.experiment=None
                 elif action=='settings':
                     if self.status=='running':raise ValueError('Pause the simulation before applying model settings')
                     settings=validate(dict(self.mine.settings,**data))
-                    self.mine=Mine(settings);self.status='ready';self.history=[];self.comparison=None
+                    self.mine=Mine(settings);self.status='ready';self.history=[];self.comparison=None;self.experiment=None
                     self.mine.event('Validated settings applied. New shift ready.')
                 elif action=='speed':
                     settings=validate(dict(self.mine.settings,speed=data.get('speed')))
@@ -216,7 +239,7 @@ class Handler(BaseHTTPRequestHandler):
             if not 0<=length<=8192:raise ValueError('Request too large')
             data=json.loads(self.rfile.read(length) or '{}')
             if not isinstance(data,dict):raise ValueError('JSON body must be an object')
-            actions={'/api/control':data.get('action'),'/api/scenario':'scenario','/api/reset':'reset','/api/settings':'settings','/api/compare':'compare'}
+            actions={'/api/control':data.get('action'),'/api/scenario':'scenario','/api/reset':'reset','/api/settings':'settings','/api/compare':'compare','/api/experiment':'experiment'}
             if self.path not in actions:return self.json(404,dict(error='Not found'))
             self.json(200,runtime.command(actions[self.path],data))
         except (ValueError,TypeError) as e:self.json(400,dict(error=str(e)))
